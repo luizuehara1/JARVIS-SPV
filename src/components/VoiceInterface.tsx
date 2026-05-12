@@ -7,13 +7,17 @@ interface VoiceInterfaceProps {
   isActive: boolean;
   volumeLevel: number;
   onToggle: () => void;
+  isConfigured?: boolean;
+  errorStatus?: string | null;
 }
 
 export const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ 
   isConnecting, 
   isActive, 
   volumeLevel,
-  onToggle 
+  onToggle,
+  isConfigured,
+  errorStatus
 }) => {
   return (
     <div className="flex flex-col items-center justify-center relative z-30 pointer-events-none">
@@ -49,6 +53,23 @@ export const VoiceInterface: React.FC<VoiceInterfaceProps> = ({
           )}
         </div>
       </motion.button>
+
+      {(!isConfigured || errorStatus) && (
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="absolute -bottom-16 w-max flex flex-col items-center"
+        >
+          <span className="text-[8px] font-mono text-jarvis-red uppercase tracking-[0.2em] glow-red">
+            {!isConfigured ? 'VAPI_KEY_MISSING' : errorStatus}
+          </span>
+          {!isConfigured && (
+            <span className="text-[7px] font-mono text-white/20 uppercase mt-1 italic">
+              Configurar em Secrets
+            </span>
+          )}
+        </motion.div>
+      )}
     </div>
   );
 };

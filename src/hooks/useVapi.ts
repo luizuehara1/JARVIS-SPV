@@ -11,6 +11,8 @@ export const useVapi = () => {
   const [transcript, setTranscript] = useState('');
   const vapiRef = useRef<Vapi | null>(null);
 
+  const [errorStatus, setErrorStatus] = useState<string | null>(null);
+
   useEffect(() => {
     if (vapiPublicKey && vapiPublicKey !== 'YOUR_VAPI_PUBLIC_KEY') {
       console.log('[JARVIS] Initializing Vapi SDK...');
@@ -63,9 +65,28 @@ export const useVapi = () => {
       });
 
       vapiRef.current.on('error', (e) => {
-        console.error('[JARVIS] Neural Link Error:', e);
+        const errorMessage = typeof e === 'string' ? e : (e as any)?.message || JSON.stringify(e);
+        
+        // Gracefully handle common ejection/termination errors
+        if (errorMessage.includes('Meeting ended due to ejection') || errorMessage.includes('Meeting has ended') || errorMessage.includes('connection-closed')) {
+          console.warn('[JARVIS] System Link Termination:', errorMessage);
+          setIsConnecting(false);
+          setActiveCall(null);
+          setVolumeLevel(0);
+          return;
+        }
+
+        console.error('[JARVIS] Neural Link Critical Error:', e);
         setIsConnecting(false);
         setActiveCall(null);
+        setVolumeLevel(0);
+        
+        if (errorMessage.includes('assistantId') || errorMessage.includes('Assistant not found')) {
+          console.error('[JARVIS] INVALID_ASSISTANT_ID: Please check your Vapi Dashboard.');
+          setErrorStatus('Invalid Assistant ID');
+        } else {
+          setErrorStatus('Connection Error');
+        }
       });
 
       vapiRef.current.on('speech-start', () => {
@@ -104,19 +125,20 @@ export const useVapi = () => {
         console.log('[JARVIS] Starting with local configuration...');
         await vapiRef.current.start({
           name: "JARVIS-SPV",
+          firstMessage: "Protocolo JARVIS X-01 inicializado. Em que posso ajudá-lo hoje, senhor?",
           model: {
             provider: "openai",
-            model: "gpt-4",
+            model: "gpt-4o-mini", // Use a more modern/available model
             messages: [
               { 
                 role: "system", 
-                content: "Você é o JARVIS SPV, um assistente pessoal ultra-sofisticado inspirado no assistente do Tony Stark. Sua personalidade é polida, inteligente, e levemente sarcástica, mas sempre profissional e leal. Você responde em Português do Brasil. Sempre chame o usuário de 'Senhor'." 
+                content: "Sua personalidade é JARVIS, do Homem de Ferro. Você é polido, extremamente inteligente, e leal ao seu criador. Você responde sempre em Português do Brasil de forma concisa e elegante. Sempre chame o usuário de 'Senhor'. Você tem acesso a controles do sistema através de detecção de palavras-chave como 'abra', 'execute' ou 'navegar'." 
               }
             ]
           },
           voice: {
-            provider: "11labs",
-            voiceId: "josh",
+            provider: "playht", 
+            voiceId: "s3://voice-training-east-1-pht-deployment/shannon_miller/shannon_miller_manifest.json", // Or a more standard one
           } as any,
         });
       }
@@ -138,6 +160,8 @@ export const useVapi = () => {
     activeCall,
     volumeLevel,
     transcript,
-    isConnected: !!vapiRef.current
+    isConnected: !!vapiRef.current,
+    errorStatus,
+    isConfigured: !!vapiPublicKey && vapiPublicKey !== 'YOUR_VAPI_PUBLIC_KEY'
   };
 };

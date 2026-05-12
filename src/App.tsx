@@ -25,7 +25,16 @@ export default function App() {
   const [showStats, setShowStats] = useState(false);
   const [showLauncher, setShowLauncher] = useState(false);
   const [showChat, setShowChat] = useState(false);
-  const { startCall, stopCall, isConnecting, activeCall, volumeLevel, transcript } = useVapi();
+  const { 
+    startCall, 
+    stopCall, 
+    isConnecting, 
+    activeCall, 
+    volumeLevel, 
+    transcript,
+    isConfigured,
+    errorStatus
+  } = useVapi();
 
   // Auth Listener
   useEffect(() => {
@@ -255,6 +264,8 @@ export default function App() {
                 isActive={!!activeCall}
                 volumeLevel={volumeLevel}
                 onToggle={handleVoiceToggle}
+                isConfigured={isConfigured}
+                errorStatus={errorStatus}
               />
             </>
           )}

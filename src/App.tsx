@@ -7,6 +7,7 @@ import { Brain, LayoutGrid, Activity, Search } from 'lucide-react';
 import { auth, db, OperationType, handleFirestoreError } from './lib/firebase.ts';
 import { useVapi } from './hooks/useVapi.ts';
 import { Message, UserPreferences } from './types.ts';
+import { extractUserTextFromVapiMessage, handleJarvisVoiceCommand } from './lib/voiceCommands.ts';
 
 import { LoginScreen } from './components/LoginScreen.tsx';
 import { HUDLayout } from './components/HUDLayout.tsx';
@@ -79,11 +80,30 @@ export default function App() {
     }, (err) => handleFirestoreError(err, OperationType.GET, 'users/history'));
   };
 
-  // Sync Vapi messages to Firestore
+  // Sync Vapi messages to Firestore and handle Voice Commands
   useEffect(() => {
     if (messages.length > 0 && user) {
       const lastMsg = messages[messages.length - 1];
-      // Only sync transcription messages if they are final
+      
+      // 1. Extract and process voice commands
+      const userText = extractUserTextFromVapiMessage(lastMsg);
+      if (userText) {
+        handleJarvisVoiceCommand(userText).then((result) => {
+          if (result.executed && result.feedback) {
+            // Add automated feedback message to history
+            const feedbackMsg = {
+              content: result.feedback,
+              role: 'assistant' as const,
+              timestamp: Date.now()
+            };
+            
+            addDoc(collection(db, 'users', user.uid, 'history'), feedbackMsg)
+              .catch(err => handleFirestoreError(err, OperationType.WRITE, 'users/history'));
+          }
+        });
+      }
+
+      // 2. Sync transcription messages if they are final
       if (lastMsg.type === 'transcript' && lastMsg.transcriptType === 'final') {
         const content = lastMsg.transcript;
         const role = lastMsg.role === 'assistant' ? 'assistant' : 'user';

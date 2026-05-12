@@ -59,14 +59,22 @@ export function useVapi() {
         
         let shouldSuppressError = false;
         try {
+          // Check for structured ejection error
+          if (err?.error?.message?.type === 'ejected' || err?.error?.error?.type === 'ejected') {
+            shouldSuppressError = true;
+          }
+
           const errorJson = JSON.stringify(err);
           console.error("[JARVIS ERROR JSON]", JSON.stringify(err, null, 2));
           
           // Detect soft termination strings in the error object
           if (
-            errorJson.includes("Meeting has ended") || 
-            errorJson.includes("ejected") || 
-            errorJson.includes("connection-closed")
+            !shouldSuppressError && (
+              errorJson.includes("Meeting has ended") || 
+              errorJson.includes("ejected") || 
+              errorJson.includes("connection-closed") ||
+              errorJson.includes("Resource not found") // Sometimes happen on sudden disconnect
+            )
           ) {
             shouldSuppressError = true;
           }
@@ -79,7 +87,7 @@ export function useVapi() {
         }
 
         if (shouldSuppressError) {
-          console.warn("[JARVIS] Session terminated gracefully.");
+          console.warn("[JARVIS] Session terminated gracefully (Suppressed soft-error).");
           setError(null);
         } else {
           setError("VAPI_CONNECTION_ERROR");

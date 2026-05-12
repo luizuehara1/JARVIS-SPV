@@ -1,0 +1,64 @@
+@import "tailwindcss";
+
+@theme {
+  --color-jarvis-blue: #00f2ff;
+  --color-jarvis-red: #ff3d00;
+  --color-jarvis-dark: #020408;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+@layer base {
+  body {
+    @apply bg-black text-cyan-400 font-sans overflow-hidden select-none min-h-screen relative;
+    background: 
+      radial-gradient(circle at 50% 50%, #020617 0%, #000 100%),
+      radial-gradient(circle at 10% 10%, rgba(0, 242, 255, 0.05) 0%, transparent 40%),
+      radial-gradient(circle at 90% 90%, rgba(0, 242, 255, 0.03) 0%, transparent 40%);
+  }
+}
+
+@layer utilities {
+  .glass {
+    @apply bg-black/40 backdrop-blur-3xl border border-white/5 rounded-2xl;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
+  }
+  
+  .glass-hologram {
+    @apply bg-jarvis-blue/[0.03] backdrop-blur-2xl border border-jarvis-blue/10 rounded-xl;
+    box-shadow: inset 0 0 20px rgba(0, 242, 255, 0.05);
+  }
+
+  .glow-blue {
+    text-shadow: 0 0 10px rgba(0, 242, 255, 0.6), 0 0 20px rgba(0, 242, 255, 0.2);
+  }
+  
+  .glow-red {
+    text-shadow: 0 0 10px rgba(255, 61, 0, 0.6), 0 0 20px rgba(255, 61, 0, 0.2);
+  }
+
+  .border-glow-blue {
+    box-shadow: 0 0 25px rgba(0, 242, 255, 0.15), inset 0 0 10px rgba(0, 242, 255, 0.05);
+    border-color: rgba(0, 242, 255, 0.3);
+  }
+
+  .hologram-grid {
+    background-image: radial-gradient(circle at 1px 1px, rgba(0, 242, 255, 0.1) 1px, transparent 0);
+    background-size: 40px 40px;
+  }
+
+  .mask-fade-bottom {
+    mask-image: linear-gradient(to top, transparent, black 15%);
+  }
+
+  .mask-fade-top {
+    mask-image: linear-gradient(to bottom, transparent, black 15%);
+  }
+
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}

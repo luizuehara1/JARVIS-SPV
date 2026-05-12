@@ -1,0 +1,6 @@
+{
+  "name": "JARVIS SPV",
+  "description": "Futuristic AI personal assistant inspired by Tony Stark's JARVIS, featuring real-time voice, persistent memory, and a cinematic HUD interface.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["AI Assistant", "Voice Interaction", "Cloud Database"]
+}

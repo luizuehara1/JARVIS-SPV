@@ -1,0 +1,57 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Helper for Conversation validation
+    function isValidConversation(data) {
+      return data.keys().hasAll(['userId', 'role', 'content', 'timestamp']) 
+        && data.keys().size() <= 6
+        && data.userId == request.auth.uid
+        && data.role in ['user', 'assistant']
+        && data.content is string && data.content.size() <= 10000
+        && data.timestamp is string;
+    }
+
+    // Helper for UserPreferences validation
+    function isValidPreferences(data) {
+      return data.userId == request.auth.uid
+        && (data.get('name', '') is string)
+        && (data.get('interests', []) is list)
+        && (data.get('projects', []) is list);
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+
+      match /history/{messageId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId) && isValidId(messageId);
+        allow create: if isOwner(userId) && isValidConversation(request.resource.data);
+        allow update: if false; // Messages are immutable
+        allow delete: if isOwner(userId);
+      }
+
+      match /preferences/{prefId} {
+        allow get: if isOwner(userId) && isValidId(prefId);
+        allow write: if isOwner(userId) && isValidPreferences(request.resource.data);
+      }
+    }
+  }
+}

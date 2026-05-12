@@ -1,148 +1,138 @@
-import Vapi from '@vapi-ai/web';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from "react";
+import Vapi from "@vapi-ai/web";
 
-const vapiPublicKey = import.meta.env.VITE_VAPI_PUBLIC_KEY;
-const vapiAssistantId = import.meta.env.VITE_VAPI_ASSISTANT_ID;
+export function useVapi() {
+  const vapiRef = useRef<any>(null);
 
-export const useVapi = () => {
+  const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [activeCall, setActiveCall] = useState<any>(null);
-  const [volumeLevel, setVolumeLevel] = useState(0);
-  const [transcript, setTranscript] = useState('');
-  const vapiRef = useRef<Vapi | null>(null);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [messages, setMessages] = useState<any[]>([]);
 
-  const [errorStatus, setErrorStatus] = useState<string | null>(null);
+  const publicKey = import.meta.env.VITE_VAPI_PUBLIC_KEY;
+  const assistantId = import.meta.env.VITE_VAPI_ASSISTANT_ID;
 
   useEffect(() => {
-    if (vapiPublicKey) {
-      console.log('[JARVIS] Initializing Vapi SDK...');
-      vapiRef.current = new Vapi(vapiPublicKey);
-
-      vapiRef.current.on('call-start', () => {
-        console.log('[JARVIS] System Link Established.');
-        setIsConnecting(false);
-        setActiveCall(true);
-      });
-
-      vapiRef.current.on('call-end', () => {
-        console.log('[JARVIS] System Link Terminated.');
-        setActiveCall(null);
-        setIsConnecting(false);
-        setVolumeLevel(0);
-        setTranscript('');
-      });
-
-      vapiRef.current.on('volume-level', (level) => {
-        setVolumeLevel(level);
-      });
-
-      vapiRef.current.on('message', (message) => {
-        if (message.type === 'transcript' && message.transcriptType === 'partial') {
-          const text = message.transcript.toLowerCase();
-          setTranscript(message.transcript);
-          
-          // Command Detection Logic
-          if (text.includes('abra') || text.includes('open') || text.includes('execute')) {
-            const apps = ['spotify', 'chrome', 'vscode', 'code', 'calculadora', 'explorer', 'navegador'];
-            const targetApp = apps.find(app => text.includes(app));
-            
-            if (targetApp) {
-              console.log(`[JARVIS] Command Intent Detected: ${targetApp}`);
-              if (window.electron) {
-                window.electron.executeCommand(targetApp).then(res => {
-                  if (res.success) {
-                    console.log(`[JARVIS] ${targetApp} opened successfully.`);
-                  } else {
-                    console.error(`[JARVIS] Failed to open ${targetApp}: ${res.error}`);
-                  }
-                });
-              } else {
-                console.warn(`[JARVIS] Protocol Simulation: Opening ${targetApp} (Feature requires local Electron run).`);
-              }
-            }
-          }
-        }
-      });
-
-      vapiRef.current.on('error', (e) => {
-        const errorMessage = typeof e === 'string' ? e : (e as any)?.message || JSON.stringify(e);
-        
-        // Gracefully handle common ejection/termination errors
-        if (errorMessage.includes('Meeting ended due to ejection') || errorMessage.includes('Meeting has ended') || errorMessage.includes('connection-closed')) {
-          console.warn('[JARVIS] System Link Termination:', errorMessage);
-          setIsConnecting(false);
-          setActiveCall(null);
-          setVolumeLevel(0);
-          return;
-        }
-
-        console.error('[JARVIS] Neural Link Critical Error:', e);
-        setIsConnecting(false);
-        setActiveCall(null);
-        setVolumeLevel(0);
-        
-        if (errorMessage.includes('assistantId') || errorMessage.includes('Assistant not found')) {
-          console.error('[JARVIS] INVALID_ASSISTANT_ID: Please check your Vapi Dashboard.');
-          setErrorStatus('Invalid Assistant ID');
-        } else {
-          setErrorStatus('Connection Error');
-        }
-      });
-
-      vapiRef.current.on('speech-start', () => {
-        console.log('[JARVIS] Jarvis is speaking...');
-      });
-
-      vapiRef.current.on('speech-end', () => {
-        console.log('[JARVIS] Jarvis finished speaking.');
-      });
-    } else {
-      console.warn('[JARVIS] VAPI_PUBLIC_KEY is missing or default. Voice interaction disabled.');
-    }
-
-    return () => {
-      if (vapiRef.current) {
-        vapiRef.current.stop();
-      }
-    };
-  }, []);
-
-  const startCall = async () => {
-    if (!vapiRef.current) {
-      console.error('[JARVIS] Vapi not initialized.');
+    if (!publicKey || !assistantId) {
+      console.error("[JARVIS] Missing Vapi env vars", { publicKey, assistantId });
+      setError("VAPI_KEY_MISSING");
       return;
     }
-    
-    console.log('[JARVIS] Initiating Neural Link Sequence...');
-    setIsConnecting(true);
-    
+
     try {
-      if (vapiAssistantId) {
-        console.log(`[JARVIS] Connecting to Assistant: ${vapiAssistantId}`);
-        await vapiRef.current.start(vapiAssistantId);
-      } else {
-        throw new Error('VITE_VAPI_ASSISTANT_ID is missing');
+      console.log("[JARVIS] Initializing Vapi SDK...");
+      const vapi = new Vapi(publicKey);
+      vapiRef.current = vapi;
+
+      vapi.on("call-start", () => {
+        console.log("[JARVIS] Call started");
+        setIsConnected(true);
+        setIsConnecting(false);
+        setError(null);
+      });
+
+      vapi.on("call-end", () => {
+        console.log("[JARVIS] Call ended");
+        setIsConnected(false);
+        setIsConnecting(false);
+        setIsSpeaking(false);
+      });
+
+      vapi.on("speech-start", () => {
+        console.log("[JARVIS] Assistant speaking");
+        setIsSpeaking(true);
+      });
+
+      vapi.on("speech-end", () => {
+        console.log("[JARVIS] Assistant stopped speaking");
+        setIsSpeaking(false);
+      });
+
+      vapi.on("message", (message: any) => {
+        console.log("[JARVIS MESSAGE]", message);
+        setMessages((prev) => [...prev, message]);
+      });
+
+      vapi.on("error", (err: any) => {
+        console.error("[JARVIS ERROR RAW]", err);
+        try {
+          console.error("[JARVIS ERROR JSON]", JSON.stringify(err, null, 2));
+        } catch {
+          console.error("[JARVIS ERROR STRING]", String(err));
+        }
+        setError("VAPI_CONNECTION_ERROR");
+        setIsConnecting(false);
+        setIsConnected(false);
+      });
+
+      return () => {
+        try {
+          vapi.stop();
+        } catch {}
+      };
+    } catch (err: any) {
+      console.error("[JARVIS INIT ERROR RAW]", err);
+      setError("VAPI_INIT_ERROR");
+    }
+  }, [publicKey, assistantId]);
+
+  const start = async () => {
+    if (!vapiRef.current) {
+      setError("VAPI_NOT_INITIALIZED");
+      return;
+    }
+
+    try {
+      setIsConnecting(true);
+      setError(null);
+      
+      // Request microphone permission first as requested
+      await navigator.mediaDevices.getUserMedia({ audio: true }).catch(err => {
+        console.error("[JARVIS MIC ERROR]", err);
+        throw new Error("MIC_PERMISSION_DENIED");
+      });
+
+      console.log("[JARVIS] Connecting to assistant:", assistantId);
+      await vapiRef.current.start(assistantId);
+    } catch (err: any) {
+      console.error("[JARVIS START ERROR RAW]", err);
+      try {
+        console.error("[JARVIS START ERROR JSON]", JSON.stringify(err, null, 2));
+      } catch {
+        console.error("[JARVIS START ERROR STRING]", String(err));
       }
-    } catch (e) {
-      console.error('[JARVIS] Critical Failure during initialization:', e);
+      
+      if (err.message === "MIC_PERMISSION_DENIED") {
+        setError("MIC_PERMISSION_DENIED");
+      } else {
+        setError("VAPI_START_ERROR");
+      }
+      
       setIsConnecting(false);
+      setIsConnected(false);
     }
   };
 
-  const stopCall = () => {
-    console.log('[JARVIS] Relinquishing System Control...');
-    vapiRef.current?.stop();
+  const stop = () => {
+    try {
+      vapiRef.current?.stop();
+      setIsConnected(false);
+      setIsConnecting(false);
+      setIsSpeaking(false);
+    } catch (err) {
+      console.error("[JARVIS STOP ERROR]", err);
+    }
   };
 
   return {
-    startCall,
-    stopCall,
+    start,
+    stop,
+    isConnected,
     isConnecting,
-    activeCall,
-    volumeLevel,
-    transcript,
-    isConnected: !!vapiRef.current,
-    errorStatus,
-    isConfigured: !!vapiPublicKey
+    isSpeaking,
+    error,
+    messages,
+    isConfigured: Boolean(publicKey && assistantId),
   };
-};
+}

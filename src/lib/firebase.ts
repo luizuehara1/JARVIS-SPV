@@ -13,17 +13,29 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
-// Initialize Firebase
 export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const provider = new GoogleAuthProvider();
 
-// Auth Helpers
-export const signInWithGoogle = () => signInWithPopup(auth, provider);
-export const logout = () => signOut(auth);
+export const signInWithGoogle = async () => {
+  try {
+    return await signInWithPopup(auth, provider);
+  } catch (error: any) {
+    if (error.code === 'auth/unauthorized-domain') {
+      const currentDomain = window.location.hostname;
+      console.error(`[JARVIS CRITICAL] Domínio não autorizado no Firebase.`);
+      console.error(`Por favor, adicione "${currentDomain}" aos domínios autorizados no Console do Firebase (Authentication > Settings > Authorized domains).`);
+      alert(`ERRO DE DOMÍNIO: Adicione "${currentDomain}" aos domínios autorizados no seu Firebase Console.`);
+    }
+    throw error;
+  }
+};
 
-// Error Handling Constants
+export const logout = async () => {
+  return await signOut(auth);
+};
+
 export enum OperationType {
   CREATE = 'create',
   UPDATE = 'update',
@@ -33,15 +45,8 @@ export enum OperationType {
   WRITE = 'write',
 }
 
-interface FirestoreErrorInfo {
-  error: string;
-  operationType: OperationType;
-  path: string | null;
-  authInfo: any;
-}
-
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
-  const errInfo: FirestoreErrorInfo = {
+  const errInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
       userId: auth.currentUser?.uid,

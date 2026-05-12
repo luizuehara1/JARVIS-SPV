@@ -56,14 +56,38 @@ export function useVapi() {
 
       vapi.on("error", (err: any) => {
         console.error("[JARVIS ERROR RAW]", err);
+        
+        let shouldSuppressError = false;
         try {
+          const errorJson = JSON.stringify(err);
           console.error("[JARVIS ERROR JSON]", JSON.stringify(err, null, 2));
+          
+          // Detect soft termination strings in the error object
+          if (
+            errorJson.includes("Meeting has ended") || 
+            errorJson.includes("ejected") || 
+            errorJson.includes("connection-closed")
+          ) {
+            shouldSuppressError = true;
+          }
         } catch {
-          console.error("[JARVIS ERROR STRING]", String(err));
+          const errorStr = String(err);
+          console.error("[JARVIS ERROR STRING]", errorStr);
+          if (errorStr.includes("Meeting has ended") || errorStr.includes("ejected")) {
+            shouldSuppressError = true;
+          }
         }
-        setError("VAPI_CONNECTION_ERROR");
+
+        if (shouldSuppressError) {
+          console.warn("[JARVIS] Session terminated gracefully.");
+          setError(null);
+        } else {
+          setError("VAPI_CONNECTION_ERROR");
+        }
+        
         setIsConnecting(false);
         setIsConnected(false);
+        setIsSpeaking(false);
       });
 
       return () => {

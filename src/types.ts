@@ -12,12 +12,16 @@ export interface UserPreferences {
   interests?: string[];
   projects?: string[];
   lastActive?: string;
+  context?: string;
 }
 
 declare global {
   interface Window {
-    electron?: {
-      executeCommand: (command: string) => Promise<{ success: boolean; error?: string }>;
+    jarvisPC?: {
+      openApp: (appName: string) => Promise<{ success: boolean; error?: string }>;
+      searchGoogle: (query: string) => Promise<{ success: boolean }>;
+      searchYoutube: (query: string) => Promise<{ success: boolean }>;
+      openUrl: (url: string) => Promise<{ success: boolean; error?: string }>;
       isElectron: boolean;
     };
   }

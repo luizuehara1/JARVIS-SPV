@@ -1,13 +1,43 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
-const isDev = require('electron-is-dev');
 const { exec } = require('child_process');
+
+// Whitelist configuration
+const WHITELISTED_APPS = {
+  'spotify': 'start spotify',
+  'chrome': 'start chrome',
+  'vscode': 'code'
+};
+
+const WHITELISTED_URLS = [
+  'google.com',
+  'youtube.com',
+  'whatsapp.com',
+  'facebook.com', // Meta Ads
+  'openai.com', // ChatGPT
+  'anthropic.com', // Claude
+  'claude.ai',
+  'google.com/aisearch', // Example for AI Studio
+  'aistudio.google.com',
+  'vercel.com',
+  'github.com',
+  'firebase.google.com'
+];
+
+function isUrlAllowed(url) {
+  try {
+    const parsed = new URL(url);
+    return WHITELISTED_URLS.some(domain => parsed.hostname.includes(domain));
+  } catch (e) {
+    return false;
+  }
+}
 
 function createWindow() {
   const win = new BrowserWindow({
     width: 1200,
     height: 800,
-    frame: false, // Keep it cinematic
+    frame: false,
     transparent: true,
     webPreferences: {
       nodeIntegration: false,
@@ -17,54 +47,52 @@ function createWindow() {
     backgroundColor: '#00000000',
   });
 
-  win.loadURL(
-    isDev
-      ? 'http://localhost:3000'
-      : `file://${path.join(__dirname, '../dist/index.html')}`
-  );
+  // Load the production Vercel URL as requested
+  win.loadURL("https://jarvis-spv.vercel.app");
   
-  if (isDev) {
-    win.webContents.openDevTools({ mode: 'detach' });
-  }
+  // DevTools only for development if needed
+  // win.webContents.openDevTools({ mode: 'detach' });
 }
 
-// IPC Handlers for System Commands
-ipcMain.handle('execute-command', async (event, command) => {
-  console.log(`[JARVIS-CORE] Received System Command: ${command}`);
-  
-  let shellCommand = '';
-  const lowerCommand = command.toLowerCase();
-
-  if (lowerCommand.includes('spotify')) {
-    shellCommand = 'start spotify';
-  } else if (lowerCommand.includes('chrome') || lowerCommand.includes('navegador')) {
-    shellCommand = 'start chrome';
-  } else if (lowerCommand.includes('vscode') || lowerCommand.includes('code')) {
-    shellCommand = 'code';
-  } else if (lowerCommand.includes('calculadora')) {
-    shellCommand = 'calc';
-  } else if (lowerCommand.includes('explorer') || lowerCommand.includes('arquivos')) {
-    shellCommand = 'explorer .';
-  } else {
-    // Attempt to run the raw command if it looks like a known app
-    shellCommand = `start ${command}`;
+// IPC Handlers
+ipcMain.handle('open-app', async (event, appName) => {
+  const command = WHITELISTED_APPS[appName.toLowerCase()];
+  if (!command) {
+    return { success: false, error: 'App not authorized' };
   }
 
   return new Promise((resolve) => {
-    if (!shellCommand) return resolve({ success: false, error: 'Command not recognized' });
-    
-    exec(shellCommand, (error) => {
+    exec(command, (error) => {
       if (error) {
-        console.error(`[JARVIS-CORE] Operation Failed: ${error.message}`);
         resolve({ success: false, error: error.message });
       } else {
-        console.log(`[JARVIS-CORE] Protocol Success: ${shellCommand}`);
         resolve({ success: true });
       }
     });
   });
 });
 
+ipcMain.handle('search-google', async (event, query) => {
+  const url = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+  await shell.openExternal(url);
+  return { success: true };
+});
+
+ipcMain.handle('search-youtube', async (event, query) => {
+  const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+  await shell.openExternal(url);
+  return { success: true };
+});
+
+ipcMain.handle('open-url', async (event, url) => {
+  if (isUrlAllowed(url)) {
+    await shell.openExternal(url);
+    return { success: true };
+  }
+  return { success: false, error: 'URL not authorized' };
+});
+
+// App lifecycle
 app.whenReady().then(createWindow);
 
 app.on('window-all-closed', () => {

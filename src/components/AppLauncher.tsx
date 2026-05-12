@@ -43,8 +43,8 @@ export const AppLauncher: React.FC<AppLauncherProps> = ({ onClose }) => {
   }, [search]);
 
   const handleLaunch = (command: string) => {
-    if (window.electron) {
-      window.electron.executeCommand(command);
+    if (window.jarvisPC) {
+      window.jarvisPC.openApp(command);
     } else {
       console.log(`[SIMULATION] Executing: ${command}`);
     }
@@ -59,6 +59,12 @@ export const AppLauncher: React.FC<AppLauncherProps> = ({ onClose }) => {
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-6"
     >
       <div className="w-full max-w-4xl glass bg-black/40 border-jarvis-blue/20 rounded-2xl overflow-hidden flex flex-col shadow-[0_0_100px_rgba(0,242,255,0.1)]">
+        {/* Banner Status Desktop */}
+        <div className={`px-8 py-2 text-center text-[10px] font-mono tracking-widest ${window.jarvisPC ? 'bg-jarvis-blue/20 text-jarvis-blue' : 'bg-white/5 text-white/20'}`}>
+          {window.jarvisPC 
+            ? "MODO DESKTOP ELECTRON ATIVO - CONTROLE TOTAL DO SISTEMA HABILITADO" 
+            : "CONTROLE DO PC DISPONÍVEL APENAS NO APP DESKTOP ELECTRON."}
+        </div>
         {/* Search Header */}
         <div className="p-8 border-b border-white/5 flex items-center gap-6">
           <Search className="text-jarvis-blue" size={28} />

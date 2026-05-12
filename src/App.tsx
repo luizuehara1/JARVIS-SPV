@@ -203,7 +203,7 @@ export default function App() {
               onClick={() => setShowMemory(false)}
             >
               <div className="w-full max-w-2xl" onClick={e => e.stopPropagation()}>
-                <MemoryPanel preferences={preferences || { name: user?.displayName || 'Unknown', context: '' }} history={history} />
+                <MemoryPanel preferences={{ name: preferences?.name || user?.displayName || 'Unknown', context: preferences?.context || '' }} history={history} />
               </div>
             </motion.div>
           )}

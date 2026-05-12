@@ -5,17 +5,20 @@ const { exec } = require('child_process');
 const screenshot = require('screenshot-desktop');
 
 // Safe Path Configuration
-const DOCUMENTS_PATH = app.getPath('documents');
-const SAFE_ROOT = path.join(DOCUMENTS_PATH, 'Jarvis-SPV');
-const SAFE_FOLDERS = {
-  notes: path.join(SAFE_ROOT, 'notes'),
-  screenshots: path.join(SAFE_ROOT, 'screenshots'),
-  exports: path.join(SAFE_ROOT, 'exports'),
-  projects: path.join(SAFE_ROOT, 'projects')
-};
+let SAFE_ROOT;
+let SAFE_FOLDERS = {};
 
 // Ensure folders exist
 async function ensureSafeFolders() {
+  const documentsPath = app.getPath('documents');
+  SAFE_ROOT = path.join(documentsPath, 'Jarvis-SPV');
+  SAFE_FOLDERS = {
+    notes: path.join(SAFE_ROOT, 'notes'),
+    screenshots: path.join(SAFE_ROOT, 'screenshots'),
+    exports: path.join(SAFE_ROOT, 'exports'),
+    projects: path.join(SAFE_ROOT, 'projects')
+  };
+
   await fs.ensureDir(SAFE_ROOT);
   for (const folder of Object.values(SAFE_FOLDERS)) {
     await fs.ensureDir(folder);
@@ -188,8 +191,18 @@ ipcMain.handle('mute-volume', async () => {
 
 // App lifecycle
 app.whenReady().then(async () => {
-  await ensureSafeFolders();
-  createWindow();
+  console.log('[JARVIS-ELECTRON] System Initializing...');
+  try {
+    await ensureSafeFolders();
+    createWindow();
+    console.log('[JARVIS-ELECTRON] Protocol Active.');
+  } catch (err) {
+    console.error('[JARVIS-ELECTRON] Initialization Failed:', err);
+  }
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('[JARVIS-MAIN] Uncaught Exception:', err);
 });
 
 app.on('window-all-closed', () => {

@@ -7,7 +7,7 @@ import { Brain, LayoutGrid, Activity, Search } from 'lucide-react';
 import { auth, db, OperationType, handleFirestoreError } from './lib/firebase.ts';
 import { useVapi } from './hooks/useVapi.ts';
 import { Message, UserPreferences } from './types.ts';
-import { extractUserTextFromVapiMessage, handleJarvisVoiceCommand } from './lib/voiceCommands.ts';
+import { extractUserTextFromVapiMessage, handleJarvisCommand } from './lib/voiceCommands.ts';
 
 import { LoginScreen } from './components/LoginScreen.tsx';
 import { HUDLayout } from './components/HUDLayout.tsx';
@@ -18,6 +18,7 @@ import { VoiceInterface } from './components/VoiceInterface.tsx';
 import { TerminalChat } from './components/TerminalChat.tsx';
 import { MemoryPanel } from './components/MemoryPanel.tsx';
 import { AppLauncher } from './components/AppLauncher.tsx';
+import { ConfirmationModal } from './components/ConfirmationModal.tsx';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -31,6 +32,9 @@ export default function App() {
   const [showLauncher, setShowLauncher] = useState(false);
   const [showChat, setShowChat] = useState(true);
 
+  // Security States
+  const [pendingAction, setPendingAction] = useState<{ message: string; resolve: (val: boolean) => void } | null>(null);
+
   const { 
     start, 
     stop, 
@@ -41,6 +45,42 @@ export default function App() {
     messages, 
     isConfigured 
   } = useVapi();
+
+  // Inject requestConfirmation to window.jarvisPC
+  useEffect(() => {
+    if (window.jarvisPC) {
+      window.jarvisPC.requestConfirmation = (message: string) => {
+        return new Promise((resolve) => {
+          setPendingAction({ message, resolve });
+        });
+      };
+    }
+  }, []);
+
+  const handleConfirmAction = () => {
+    if (pendingAction) {
+      pendingAction.resolve(true);
+      setPendingAction(null);
+    }
+  };
+
+  const handleCancelAction = () => {
+    if (pendingAction) {
+      pendingAction.resolve(false);
+      setPendingAction(null);
+      
+      // Feedback for cancellation
+      const cancelMsg = {
+        content: "Comando cancelado por segurança, senhor.",
+        role: 'assistant' as const,
+        timestamp: Date.now()
+      };
+      if (user) {
+        addDoc(collection(db, 'users', user.uid, 'history'), cancelMsg)
+          .catch(err => handleFirestoreError(err, OperationType.WRITE, 'users/history'));
+      }
+    }
+  };
 
   // Auth Listener
   useEffect(() => {
@@ -88,7 +128,7 @@ export default function App() {
       // 1. Extract and process voice commands
       const userText = extractUserTextFromVapiMessage(lastMsg);
       if (userText) {
-        handleJarvisVoiceCommand(userText).then((result) => {
+        handleJarvisCommand(userText).then((result) => {
           if (result.executed && result.feedback) {
             // Add automated feedback message to history
             const feedbackMsg = {
@@ -205,8 +245,47 @@ export default function App() {
                 </span>
               </button>
               
-              <div className="flex-1 p-6 overflow-hidden">
-                <TerminalChat history={history} messages={messages} isVisible={showChat} />
+              <div className="flex-1 p-6 overflow-hidden flex flex-col">
+                <div className="flex-1 overflow-hidden">
+                  <TerminalChat history={history} messages={messages} isVisible={showChat} />
+                </div>
+                {showChat && (
+                  <div className="mt-4 pt-4 border-t border-white/5">
+                    <input 
+                      type="text"
+                      placeholder="Protocol command input..."
+                      className="w-full bg-transparent border-none outline-none text-jarvis-blue font-mono text-[11px] placeholder:text-white/10 uppercase tracking-widest"
+                      onKeyDown={async (e) => {
+                        if (e.key === 'Enter' && e.currentTarget.value.trim() && user) {
+                          const val = e.currentTarget.value;
+                          e.currentTarget.value = '';
+                          
+                          // Add to local history
+                          const userMsg = { content: val, role: 'user' as const, timestamp: Date.now() };
+                          await addDoc(collection(db, 'users', user.uid, 'history'), userMsg);
+
+                          const result = await handleJarvisCommand(val);
+                          
+                          if (result.executed) {
+                            const feedbackMsg = {
+                              content: result.feedback || "Comando executado, senhor.",
+                              role: 'assistant' as const,
+                              timestamp: Date.now()
+                            };
+                            await addDoc(collection(db, 'users', user.uid, 'history'), feedbackMsg);
+                          } else {
+                            const feedbackMsg = {
+                              content: "Senhor, não entendi qual ação deseja executar.",
+                              role: 'assistant' as const,
+                              timestamp: Date.now()
+                            };
+                            await addDoc(collection(db, 'users', user.uid, 'history'), feedbackMsg);
+                          }
+                        }
+                      }}
+                    />
+                  </div>
+                )}
               </div>
             </motion.div>
           </div>
@@ -236,12 +315,24 @@ export default function App() {
               className="absolute right-28 top-1/2 -translate-y-1/2 w-80 glass-hologram p-8 z-[100] border border-jarvis-blue/20"
             >
               <h2 className="text-[12px] font-bold uppercase tracking-[0.4em] mb-8 text-jarvis-blue glow-blue">Neural Diagnostics</h2>
-              <div className="space-y-6">
+              <div className="space-y-4 mb-8">
                 <DiagRow label="Vapi Status" value={isConnected ? 'CONNECTED' : isConnecting ? 'SYNCING' : 'STANDBY'} highlight={isConnected} />
                 <DiagRow label="Neural Link" value={isSpeaking ? 'TRANSMITTING' : 'LISTENING'} highlight={isSpeaking} />
+              </div>
+
+              <h3 className="text-[9px] font-mono text-white/40 uppercase tracking-widest mb-4 border-b border-white/5 pb-2">Jarvis Permissions</h3>
+              <div className="space-y-2 mb-6">
+                <PermissionRow label="Controle de apps" value="ATIVO" active />
+                <PermissionRow label="Pesquisa Web" value="ATIVO" active />
+                <PermissionRow label="Arquivos Seguros" value="ATIVO" active />
+                <PermissionRow label="Pastas Comuns" value="ATIVO" active />
+                <PermissionRow label="Comandos Sensíveis" value="CONFIRMAÇÃO" active />
+                <PermissionRow label="Terminal Livre" value="BLOQUEADO" />
+                <PermissionRow label="Acesso Total" value="BLOQUEADO" />
+              </div>
+
+              <div className="space-y-4">
                 <DiagRow label="Access Node" value="JARVIS-X.01" />
-                <DiagRow label="Assistant ID" value={import.meta.env.VITE_VAPI_ASSISTANT_ID?.slice(0, 8) + '...'} />
-                <DiagRow label="Public Key" value={import.meta.env.VITE_VAPI_PUBLIC_KEY?.slice(0, 8) + '...'} />
                 {error && <DiagRow label="System Error" value={error} error />}
               </div>
             </motion.div>
@@ -249,6 +340,13 @@ export default function App() {
 
           {showLauncher && <AppLauncher onClose={() => setShowLauncher(false)} />}
         </AnimatePresence>
+
+        <ConfirmationModal 
+          isOpen={!!pendingAction}
+          message={pendingAction?.message || ''}
+          onConfirm={handleConfirmAction}
+          onCancel={handleCancelAction}
+        />
       </main>
 
       <footer className="h-12 px-10 flex items-center justify-between border-t border-white/5 bg-black/40 backdrop-blur-xl z-20">
@@ -286,6 +384,18 @@ const HUDButton = ({ active, onClick, icon, label }: { active: boolean; onClick:
     {icon}
     <span className="text-[7px] mt-1 font-mono font-bold tracking-widest">{label}</span>
   </motion.button>
+);
+
+const PermissionRow = ({ label, value, active }: { label: string; value: string; active?: boolean }) => (
+  <div className="flex justify-between items-center py-1">
+    <span className="text-[7px] text-white/20 uppercase tracking-widest font-mono">{label}</span>
+    <div className="flex items-center gap-2">
+      <div className={`w-1 h-1 rounded-full ${active ? 'bg-jarvis-blue glow-blue' : 'bg-white/5'}`} />
+      <span className={`text-[8px] font-mono tracking-tighter ${active ? 'text-jarvis-blue/80' : 'text-white/10'}`}>
+        {value}
+      </span>
+    </div>
+  </div>
 );
 
 const DiagRow = ({ label, value, highlight, error }: { label: string; value: string; highlight?: boolean; error?: boolean }) => (

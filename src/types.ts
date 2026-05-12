@@ -22,16 +22,6 @@ declare global {
       searchGoogle: (query: string) => Promise<{ success: boolean }>;
       searchYoutube: (query: string) => Promise<{ success: boolean }>;
       openUrl: (url: string) => Promise<{ success: boolean; error?: string }>;
-      openFolder: (folderName: string) => Promise<{ success: boolean }>;
-      createFile: (data: { name: string; content: string; subfolder?: string }) => Promise<{ success: boolean; path?: string; error?: string }>;
-      readFile: (data: { name: string; subfolder?: string }) => Promise<{ success: boolean; content?: string; error?: string }>;
-      moveFile: (data: { oldPath: string; newPath: string }) => Promise<{ success: boolean; error?: string }>;
-      renameFile: (data: { filePath: string; newName: string }) => Promise<{ success: boolean; path?: string; error?: string }>;
-      takeScreenshot: () => Promise<{ success: boolean; path?: string; error?: string }>;
-      volumeUp: () => Promise<{ success: boolean }>;
-      volumeDown: () => Promise<{ success: boolean }>;
-      muteVolume: () => Promise<{ success: boolean }>;
-      requestConfirmation?: (message: string) => Promise<boolean>;
       isElectron: boolean;
     };
   }

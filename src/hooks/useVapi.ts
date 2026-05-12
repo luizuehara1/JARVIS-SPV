@@ -14,7 +14,7 @@ export const useVapi = () => {
   const [errorStatus, setErrorStatus] = useState<string | null>(null);
 
   useEffect(() => {
-    if (vapiPublicKey && vapiPublicKey !== 'YOUR_VAPI_PUBLIC_KEY') {
+    if (vapiPublicKey) {
       console.log('[JARVIS] Initializing Vapi SDK...');
       vapiRef.current = new Vapi(vapiPublicKey);
 
@@ -117,30 +117,11 @@ export const useVapi = () => {
     setIsConnecting(true);
     
     try {
-      // If we have an assistant ID, prioritize it. Otherwise use the transient config.
-      if (vapiAssistantId && vapiAssistantId !== 'YOUR_VAPI_ASSISTANT_ID') {
+      if (vapiAssistantId) {
         console.log(`[JARVIS] Connecting to Assistant: ${vapiAssistantId}`);
         await vapiRef.current.start(vapiAssistantId);
       } else {
-        console.log('[JARVIS] Starting with local configuration...');
-        await vapiRef.current.start({
-          name: "JARVIS-SPV",
-          firstMessage: "Protocolo JARVIS X-01 inicializado. Em que posso ajudá-lo hoje, senhor?",
-          model: {
-            provider: "openai",
-            model: "gpt-4o-mini", // Use a more modern/available model
-            messages: [
-              { 
-                role: "system", 
-                content: "Sua personalidade é JARVIS, do Homem de Ferro. Você é polido, extremamente inteligente, e leal ao seu criador. Você responde sempre em Português do Brasil de forma concisa e elegante. Sempre chame o usuário de 'Senhor'. Você tem acesso a controles do sistema através de detecção de palavras-chave como 'abra', 'execute' ou 'navegar'." 
-              }
-            ]
-          },
-          voice: {
-            provider: "playht", 
-            voiceId: "s3://voice-training-east-1-pht-deployment/shannon_miller/shannon_miller_manifest.json", // Or a more standard one
-          } as any,
-        });
+        throw new Error('VITE_VAPI_ASSISTANT_ID is missing');
       }
     } catch (e) {
       console.error('[JARVIS] Critical Failure during initialization:', e);
@@ -162,6 +143,6 @@ export const useVapi = () => {
     transcript,
     isConnected: !!vapiRef.current,
     errorStatus,
-    isConfigured: !!vapiPublicKey && vapiPublicKey !== 'YOUR_VAPI_PUBLIC_KEY'
+    isConfigured: !!vapiPublicKey
   };
 };

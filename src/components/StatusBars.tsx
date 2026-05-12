@@ -1,15 +1,21 @@
 import { format } from 'date-fns';
-import { Shield, Signal, Cpu } from 'lucide-react';
+import { Shield, Signal, Cpu, LogIn, LogOut, User } from 'lucide-react';
 import { motion } from 'motion/react';
 import React, { useEffect, useState } from 'react';
+import { auth, signInWithGoogle, logout } from '../lib/firebase';
 
 export const StatusBars: React.FC = () => {
   const [time, setTime] = useState(new Date());
-  const vapiConfigured = !!import.meta.env.VITE_VAPI_PUBLIC_KEY && import.meta.env.VITE_VAPI_PUBLIC_KEY !== 'YOUR_VAPI_PUBLIC_KEY';
+  const [user, setUser] = useState(auth.currentUser);
+  const vapiConfigured = !!import.meta.env.VITE_VAPI_PUBLIC_KEY;
 
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
-    return () => clearInterval(timer);
+    const unsubscribe = auth.onAuthStateChanged((u) => setUser(u));
+    return () => {
+      clearInterval(timer);
+      unsubscribe();
+    };
   }, []);
 
   return (
@@ -27,8 +33,8 @@ export const StatusBars: React.FC = () => {
         </div>
       </div>
       
-      <div className="flex flex-col items-center">
-        <div className="px-4 py-1 glass-hologram border border-white/5 flex items-center gap-3 backdrop-blur-3xl">
+      <div className="flex gap-4 pointer-events-auto">
+        <div className="px-4 py-1 glass-hologram border border-white/5 flex items-center gap-3 backdrop-blur-3xl min-w-[200px] justify-center">
           <motion.div 
             animate={{ opacity: [0.4, 1, 0.4] }}
             transition={{ duration: 2, repeat: Infinity }}
@@ -38,6 +44,24 @@ export const StatusBars: React.FC = () => {
             {vapiConfigured ? 'Neuro-Link: Online' : 'Neuro-Link: Restrict'}
           </span>
         </div>
+        
+        {user ? (
+          <button 
+            onClick={logout}
+            className="px-4 py-1 glass-hologram border border-white/5 flex items-center gap-2 hover:bg-white/5 transition-colors"
+          >
+            <LogOut size={12} className="text-white/40" />
+            <span className="text-[9px] font-mono tracking-[0.2em] uppercase text-white/40">Logout</span>
+          </button>
+        ) : (
+          <button 
+            onClick={signInWithGoogle}
+            className="px-4 py-1 glass-hologram border border-jarvis-blue/20 flex items-center gap-2 hover:bg-jarvis-blue/10 transition-colors"
+          >
+            <LogIn size={12} className="text-jarvis-blue" />
+            <span className="text-[9px] font-mono tracking-[0.2em] uppercase text-jarvis-blue">Login</span>
+          </button>
+        )}
       </div>
 
       <div className="flex items-center gap-8 pointer-events-auto">

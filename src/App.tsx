@@ -13,7 +13,7 @@ import { TerminalChat } from './components/TerminalChat.tsx';
 import { VoiceInterface } from './components/VoiceInterface.tsx';
 import { AppLauncher } from './components/AppLauncher.tsx';
 import { useVapi } from './hooks/useVapi.ts';
-import { auth, db, signInWithGoogle, OperationType, handleFirestoreError } from './lib/firebase.ts';
+import { auth, db, signInWithGoogle, logout, OperationType, handleFirestoreError } from './lib/firebase.ts';
 import { Message, UserPreferences } from './types.ts';
 
 export default function App() {
@@ -70,6 +70,29 @@ export default function App() {
       setIsInitializing(false);
     }, (err) => handleFirestoreError(err, OperationType.GET, 'users/history'));
   };
+
+  // Add message to history and firestore
+  const addMessage = async (content: string, role: 'user' | 'assistant') => {
+    if (!user) return;
+    const msg: any = {
+      content,
+      role,
+      timestamp: Date.now()
+    };
+    
+    try {
+      await setDoc(doc(collection(db, 'users', user.uid, 'history')), msg);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, 'users/history');
+    }
+  };
+
+  // Watch for transcript and save on meaningful end
+  useEffect(() => {
+    if (!activeCall && transcript && transcript.length > 5) {
+      addMessage(transcript, 'assistant'); // Assuming transcript is what JARVIS said
+    }
+  }, [activeCall]);
 
   const handleVoiceToggle = () => {
     if (activeCall) {
